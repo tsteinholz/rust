@@ -9,6 +9,7 @@
 // except according to those terms.
 
 #![feature(rustc_attrs)]
+use std::os::raw;
 
 #[rustc_mir]
 fn test1(a: isize, b: (i32, i32), c: &[i32]) -> (isize, (i32, i32), &[i32]) {
@@ -88,6 +89,32 @@ fn test8() -> isize {
     Two::two()
 }
 
+extern fn simple_extern(x: u32, y: (u32, u32)) -> u32 {
+    x + y.0 * y.1
+}
+
+#[rustc_mir]
+fn test9() -> u32 {
+    simple_extern(41, (42, 43))
+}
+
+extern {
+    #[cfg_attr(windows, link_name="wsprintfA")]
+    fn sprintf(_: *mut raw::c_char, _: *const raw::c_char, ...) -> raw::c_int;
+}
+
+#[rustc_mir]
+fn test10(i: i32, j: i32, k: i32) -> Vec<raw::c_char> {
+    let mut x: Vec<raw::c_char> = Vec::with_capacity(512);
+    unsafe {
+        let out = sprintf(x.as_mut_ptr(), b"%d %d %d\0".as_ptr() as *const raw::c_char, i, j, k);
+        assert!(out > 0);
+        x.set_len(out as usize);
+    }
+    x
+}
+
+
 #[rustc_mir]
 fn test_closure<F>(f: &F, x: i32, y: i32) -> i32
     where F: Fn(i32, i32) -> i32
@@ -117,6 +144,8 @@ fn main() {
     assert_eq!(test6(&Foo, 12367), 12367);
     assert_eq!(test7(), 1);
     assert_eq!(test8(), 2);
+    assert_eq!(test9(), 41 + 42 * 43);
+    assert_eq!(&test10(0, 42, 31415), &[48, 32, 52, 50, 32, 51, 49, 52, 49, 53]);
 
     let closure = |x: i32, y: i32| { x + y };
     assert_eq!(test_closure(&closure, 100, 1), 101);
